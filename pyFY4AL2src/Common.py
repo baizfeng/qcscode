@@ -7,6 +7,7 @@
 import collections
 from xml.dom import minidom
 from netCDF4 import Dataset
+import h5py
 import numpy as np
 import numpy.ma as ma
 import datetime
@@ -152,6 +153,7 @@ def Read_Data(filepath, varName):
     :param varName:
     :return: 数据，array类型
     """
+    # 分割变量名
     if (varName in ("LSE_8.5um", "LSE_10.8um", "LSE_12.0um")):
         band = varName.split('_')[1]
         varName = varName.split('_')[0]
@@ -161,69 +163,46 @@ def Read_Data(filepath, varName):
                     'Precipitation_24h')):
         varName = varName.split('_')[0]
 
+    # 读取数据
     if (varName == "ACI"):
-        with Dataset(filepath, 'r') as fid:
-            ACI_R = fid.variables["Channel0161"][:]
-            ACI_G = fid.variables["Channel0083"][:]
-            ACI_B = fid.variables["Channel0065"][:]
+        with h5py.File(filepath, 'r') as fid:
+            ACI_R = fid["Channel0161"][:]
+            ACI_G = fid["Channel0083"][:]
+            ACI_B = fid["Channel0065"][:]
         fy4_data = np.dstack((ACI_R, ACI_G, ACI_B))
     elif (varName == "AMV"):
-        with Dataset(filepath, 'r') as fid:
-            wind_direction = fid.variables["wind_direction"][:]
-            wind_speed = fid.variables["wind_speed"][:]
-            pressure = fid.variables["pressure"][:]
+        with h5py.File(filepath, 'r') as fid:
+            wind_direction = fid["wind_direction"][:]
+            wind_speed = fid["wind_speed"][:]
+            pressure = fid["pressure"][:]
         fy4_data = np.array([wind_speed, wind_direction, pressure])
-    elif (varName == "DSD"):
-        with Dataset(filepath, 'r') as fid:
-            dst = fid.variables["DST"][:]
-            iddi = fid.variables["IDDI_BK"][:]
-        if (isinstance(dst, ma.MaskedArray)):
-            dst = dst.data
-        if (isinstance(iddi, ma.MaskedArray)):
-            iddi = iddi.data
-        if (dst.dtype == 'uint16'):
-            dst.dtype = np.int16
-            dst = dst.byteswap()
-        fy4_data = np.dstack([dst, iddi])
     elif (varName == "CLM"):
-        with Dataset(filepath, 'r') as fid:
-            fy4_data = fid.variables["CLM"][:]
-			
-        with Dataset("/FY4APGSQCS/QCS/pyFY4AL2src/LUT/Land1_Ocean0.NC", 'r') as fid:
-            qcbin4 = fid.variables["mask"][:]			
-        if (isinstance(fy4_data, ma.MaskedArray)):
-            fy4_data = fy4_data.data
-			
+        with h5py.File(filepath, 'r') as fid:
+            fy4_data = fid["CLM"][:]
+        with h5py.File("/FY4APGSQCS/QCS/pyFY4AL2src/LUT/Land1_Ocean0.NC", 'r') as fid:
+            qcbin4 = fid["mask"][:]
         fy4_data[(fy4_data == 2) & (qcbin4 == 1)] = 4
         fy4_data[(fy4_data == 2) & (qcbin4 == 0)] = 5
         fy4_data[(fy4_data == 3) & (qcbin4 == 1)] = 6
-        fy4_data[(fy4_data == 3) & (qcbin4 == 0)] = 7	
+        fy4_data[(fy4_data == 3) & (qcbin4 == 0)] = 7
+    elif (varName == "DSD"):
+        with h5py.File(filepath, 'r') as fid:
+            dst = fid["DST"][:]
+            iddi = fid["IDDI_BK"][:]
+        fy4_data = np.dstack([dst, iddi])
     else:
-        # 读取FY4数据
-        with Dataset(filepath, 'r') as fid:
-            fy4_data = fid.variables[varName][:]
+        with h5py.File(filepath, 'r') as fid:
+            fy4_data = fid[varName][:]
         if ((np.ndim(fy4_data) == 3) & (varName == 'AOD')):
             fy4_data = fy4_data[1]
         elif ((np.ndim(fy4_data) == 3) & (varName == 'LSE')):
             if (band == '8.5um'):
-                fy4_data = np.round(fy4_data[0] * 10000, 0)
+                fy4_data = fy4_data[0]
             elif (band == '10.8um'):
-                fy4_data = np.round(fy4_data[1] * 10000, 0)
+                fy4_data = fy4_data[1]
             elif (band == '12.0um'):
-                fy4_data = np.round(fy4_data[2] * 10000, 0)
-        if (isinstance(fy4_data, ma.MaskedArray)):
-            fy4_data = fy4_data.data
-        if (fy4_data.dtype == 'uint16'):
-            fy4_data.dtype = np.int16
-            fy4_data = fy4_data.byteswap()
-        elif (fy4_data.dtype == 'uint32'):
-            fy4_data.dtype = np.int32
-            fy4_data = fy4_data.byteswap()
-        elif ((fy4_data.dtype == 'float32') & (varName != 'LSE')):
-            fy4_data = fy4_data.astype(np.int16)  # 数据类型转换
-            fy4_data = fy4_data.byteswap()
+                fy4_data = fy4_data[2]
     return fy4_data
-
 
 def Read_LUT(prjType, filepath, dataRes, rows):
     """
@@ -275,7 +254,6 @@ def MaskInValid(fy4_data, varName):
         fy4_mdata_ = ma.masked_values(fy4_data, -999.)
         fy4_mdata = fy4_mdata_ * 0.001
     elif (varName == "RDC_Rank"):
-        fy4_data[fy4_data == 0] = 7
         fy4_mdata = ma.masked_values(fy4_data, 255)
     elif (varName == "OLR"):
         fy4_data[(fy4_data > 450) | (fy4_data < 40)] = -999
@@ -307,7 +285,7 @@ def MaskInValid(fy4_data, varName):
         fy4_mdata = fy4_mdata / 1000.0
         fy4_mdata[(fy4_mdata > 27) | (fy4_mdata < 0)] = -999
     elif (varName == "TFTP_Z_depth"):
-        fy4_data[(fy4_data > 1) | (fy4_data < 0)] = -999
+        fy4_data[(fy4_data > 1) | (fy4_data <= 0)] = -999
         fy4_mdata = ma.masked_values(fy4_data, -999)
     elif (varName == "SSI"):
         fy4_data[fy4_data == 65535] = -999
@@ -567,10 +545,10 @@ def DrawPara_con(varName):
 
 def DrawPara_dis(varName):
     if (varName == "RDC_Rank"):
-        colors = ["#ff0000", "#04ac30", "#81b805", "#b7fe9a", "#f7f80f", "#ff7a00", "#448764", "#c8c8c8"]
-        names = ['CI', 'Extinct', 'Preserve', 'Deep Develop', 'RDC4', 'RDC5', 'RDC6', 'Invalid']
-        # -1:CI;1:Exctinct;2:preserve;3:deepdevelop;4:rdc4;5:rdc5;6:rdc6
-        values = [-1.9, -0.9, 1.1, 2.1, 3.1, 4.1, 5.1, 6.1, 7.1]
+        colors = ["#ff7a00", "#ff0000", "#c8c8c8", "#b7fe9a"]
+        names = ['Possible CI', 'CI', 'Invalid Value', 'Develop']
+        # -2:Possible CI;-1:CI;0:Invalid value;1:Develop;
+        values = [-3, -2, -1, 0, 1]
     elif (varName == 'SNC'):
         colors = ["#000000", "#faff01", "#d8bfd6", "#a65026", "#000188", "#ffffff", "#008b8b", "#00ffff", "#a60100"]
         names = ['Bad Data', 'Uncertain', 'Night', 'Clear Land', 'Water', 'Cloud', 'Ice', 'Snow', 'Saturated']

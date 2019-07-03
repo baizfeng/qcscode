@@ -15,7 +15,7 @@ if __name__ == "__main__":
     try:
         # 1.解析XML文件
         xmlpath = sys.argv[1]
-        # xmlpath = r"D:\DATA\QCS\L2\CLM\FY4A-_AGRI--_N_DISK_1047E_L2-_CLM-_MULT_NOM_20190524020000_20190524021459_4000M_V0001.xml"
+        # xmlpath = r"D:\DATA\QCS\L2\ULR\FY4A-_AGRI--_N_DISK_1047E_L2-_ULR-_MULT_NOM_20180829180000_20180829181459_4000M_V0001.xml"
         nodes = Read_xml(xmlpath)
         # 2.数据的基本信息
         baseInfo, nodes['varName'] = GetBaseInfo(nodes['inputFileName'], nodes['varName'])
