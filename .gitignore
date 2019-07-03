@@ -1,0 +1,16 @@
+#忽略图片
+*.png
+*.jpg
+
+#忽略py编译文件
+*.pyc
+
+#忽略shp数据
+*.dbf
+*.prj
+*.sbn
+*.sbx
+*.shx
+
+#忽略字体文件
+*.ttf
