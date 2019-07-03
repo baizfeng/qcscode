@@ -11,6 +11,7 @@
 *.sbn
 *.sbx
 *.shx
+*.shp
 
 #忽略字体文件
 *.ttf
